@@ -11,6 +11,7 @@ primary_region = 'cdg'
   source = "pb_data"
 
 [build]
+  dockerfile = "Dockerfile"
 
 [http_service]
   internal_port = 8080

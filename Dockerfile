@@ -1,24 +1,34 @@
+# Start from the latest official Go image
+FROM golang:1.22 as builder
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy go mod and sum files
+COPY go.mod go.sum ./
+
+# Download all dependencies
+RUN go mod download
+
+# Copy the source code into the container
+COPY . .
+
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+
+# Start a new stage from scratch
 FROM alpine:latest
 
-ARG PB_VERSION=0.22.18
+RUN apk --no-cache add ca-certificates
 
-RUN apk add --no-cache \
-    unzip \
-    ca-certificates \
-    # this is needed only if you want to use scp to copy later your pb_data locally
-    openssh
+WORKDIR /root/
 
-# download and unzip PocketBase
-ADD https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip /tmp/pb.zip
-RUN unzip /tmp/pb.zip -d /pb/
+# Copy the pre-built binary file from the previous stage
+COPY --from=builder /app/main .
 
-# uncomment to copy the local pb_migrations dir into the container
-COPY ./migrations /pb/migrations
+# Copy any additional necessary files (like static assets)
+COPY --from=builder /app/migrations ./migrations
+# COPY --from=builder /app/pb_public ./pb_public
 
-# uncomment to copy the local pb_hooks dir into the container
-# COPY ./pb_hooks /pb/pb_hooks
-
-EXPOSE 8080
-
-# start PocketBase
-CMD ["/pb/pocketbase", "serve", "--http=0.0.0.0:8080"]
+# Command to run the executable
+CMD ["./main", "serve", "--http=0.0.0.0:8080"]
